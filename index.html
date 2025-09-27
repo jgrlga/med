@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MedCalc PWA</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <style>
+    :root { --pad: 16px; }
+    html, body { margin:0; padding:0; font-family: -apple-system, system-ui, Arial; background:#fff; color:#111; }
+    header { padding: var(--pad); font-weight: 800; border-bottom: 1px solid #eee; position: sticky; top:0; background: #fff; z-index: 2;}
+    main { padding: var(--pad); max-width: 980px; margin: 0 auto; }
+    .card { border: 1px solid #e5e5e5; border-radius: 12px; padding:16px; margin:14px 0; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    label { font-size: 13px; color: #333; }
+    input, select { width: 100%; padding: 10px; border:1px solid #ccc; border-radius: 8px; font-size: 16px; }
+    button { padding: 12px 16px; border:0; border-radius: 10px; font-weight: 600; cursor:pointer; }
+    button.primary { background:#000; color:#fff; }
+    .result { font-size: 18px; font-weight:700; margin-top:8px; }
+    .note { font-size: 12px; color:#666; }
+    nav.calc-list { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:10px; }
+    nav.calc-list a { display:block; padding:12px; border:1px solid #eee; border-radius:10px; text-decoration:none; color:#000; }
+    .muted { color:#666; font-size:12px; }
+    .meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.meta .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid #eee;border-radius:999px;font-size:12px;color:#333}
+.meta .badge span.emoji{font-size:14px}
+.fitz-grid{display:grid;grid-template-columns: repeat(3, 1fr); gap:10px}
+.fitz-tile{border:1px solid #eee;border-radius:12px;overflow:hidden}
+.fitz-img{height:80px}
+.fitz-info{padding:8px;font-size:12px}
+.icd-list{list-style:none;padding-left:0}
+.icd-item{border:1px solid #eee;border-radius:10px;padding:10px;margin:8px 0}
+.icd-item small{color:#666}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  </style>
+</head>
+<body>
+  <header>MedCalc</header>
+  <main>
+
+    <section id="icd" class="card">
+      <h3>Buscador CIE-11 (ICD-11)</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🧾</span><b>Base:</b> API oficial ICD-11 (WHO)<br><b>Uso:</b> Buscar códigos y entidades</div>
+      </div>
+      <details>
+        <summary>Configurar acceso (una vez)</summary>
+        <div class="settings-grid" style="margin-top:10px">
+          <div>
+            <label>Endpoint de búsqueda</label>
+            <input id="icd_endpoint" placeholder="https://id.who.int/icd/entity/search">
+          </div>
+          <div>
+            <label>Token (Bearer)</label>
+            <input id="icd_token" placeholder="pega tu token...">
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <button onclick="saveICDSettings()">Guardar</button>
+          <span class="muted">Se guarda en este dispositivo.</span>
+        </div>
+      </details>
+      <div class="grid" style="margin-top:12px">
+        <div><label>Búsqueda</label><input id="icd_q" placeholder="ej. diabetes, J45, appendicitis..."></div>
+        <div>
+          <label>Idioma</label>
+          <select id="icd_lang">
+            <option value="es">es</option>
+            <option value="en">en</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="icdSearch()">Buscar</button>
+        <div id="icd_status" class="note" style="margin-top:8px"></div>
+        <ul id="icd_results" class="icd-list"></ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Calculadoras</h2>
+      <nav class="calc-list">
+        <a href="#datediff">Diferencia entre fechas</a>
+        <a href="#bmi">IMC, Peso ideal</a>
+        <a href="#ckdepi">FG (CKD-EPI 2021)</a>
+        <a href="#alvarado">Alvarado</a>
+        <a href="#ripasa">RIPASA</a>
+        <a href="#fitzpatrick">Fitzpatrick</a>
+        <a href="#aha2025">Riesgo CV (AHA 2025)</a>
+        <a href="#pregwheel">Rueda de embarazo</a>
+        <a href="#abl">ABL permisible</a>
+        <a href="#childpugh">Child-Pugh</a>
+        <a href="#calccorr">Calcio corregido</a>
+        <a href="#peddose">Dosis pediátrica</a>
+        <a href="#gcs">Glasgow (adulto/peds)</a>
+        <a href="#gbs">Glasgow-Blatchford</a>
+      </nav>
+      <p class="muted">Todo corre local en tu dispositivo. ⚠︎ No sustituye criterio clínico.</p>
+    </section>
+
+    <section id="datediff" class="card">
+      <h3>Diferencia entre dos fechas</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">📆</span><b>Base:</b> Resta de fechas<br><b>Uso:</b> Planificación de intervalos</div>
+      </div>
+      <div class="grid">
+        <div><label>Fecha inicio</label><input type="date" id="d1"></div>
+        <div><label>Fecha fin</label><input type="date" id="d2"></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcDateDiff()">Calcular</button>
+        <div id="datediff_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="bmi" class="card">
+      <h3>IMC (M/F) y Peso ideal</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">⚖️</span><b>Base:</b> IMC OMS + IBW (Hamwi/Devine/Robinson/Miller)<br><b>Uso:</b> Nutrición/antropometría</div>
+      </div>
+      <div class="grid">
+        <div><label>Sexo</label><select id="bmi_sex"><option value="M">Masculino</option><option value="F">Femenino</option></select></div>
+        <div><label>Peso (kg)</label><input type="number" step="0.01" id="bmi_w"></div>
+        <div><label>Estatura (m)</label><input type="number" step="0.001" id="bmi_h"></div>
+        <div><label>Fórmula peso ideal</label>
+          <select id="ibw_formula">
+            <option value="Hamwi">Hamwi</option>
+            <option value="Devine">Devine</option>
+            <option value="Robinson">Robinson</option>
+            <option value="Miller">Miller</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcBMI()">Calcular</button>
+        <div id="bmi_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="ckdepi" class="card">
+      <h3>FG estimado (CKD-EPI 2021)</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🧪</span><b>Base:</b> CKD-EPI 2021 (creat, sin raza)<br><b>Uso:</b> Detección y estadiaje ERC</div>
+      </div>
+      <div class="grid">
+        <div><label>Creatinina sérica (mg/dL)</label><input id="cr" type="number" step="0.01"></div>
+        <div><label>Edad (años)</label><input id="age_ckd" type="number" step="1"></div>
+        <div><label>Sexo</label><select id="sex_ckd"><option value="M">Hombre</option><option value="F">Mujer</option></select></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcCKDEPI()">Calcular</button>
+        <div id="ckd_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="alvarado" class="card">
+      <h3>Escala de Alvarado</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🩺</span><b>Base:</b> Puntuación clínica 0–10<br><b>Uso:</b> Sospecha de apendicitis</div>
+      </div>
+      <div class="grid">
+        <div><label>Migración del dolor</label><select id="alv_mig"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Anorexia</label><select id="alv_ano"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Náuseas/Vómitos</label><select id="alv_nv"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Dolor FID</label><select id="alv_rlq"><option value="0">No</option><option value="2">Sí (2)</option></select></div>
+        <div><label>Rebote/Dolor</label><select id="alv_reb"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Temperatura ≥37.3°C</label><select id="alv_temp"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Leucocitosis</label><select id="alv_wbc"><option value="0">No</option><option value="2">Sí (2)</option></select></div>
+        <div><label>Desviación izquierda</label><select id="alv_shift"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcAlvarado()">Calcular</button>
+        <div id="alvarado_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="ripasa" class="card">
+      <h3>RIPASA</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">📊</span><b>Base:</b> Escala clínica ponderada<br><b>Uso:</b> Probabilidad de apendicitis</div>
+      </div>
+      <div class="grid">
+        <div><label>Edad ≥40</label><select id="ri_age"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Hombre</label><select id="ri_male"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Dolor FID</label><select id="ri_rlq"><option value="0">No</option><option value="0.5">Sí (0.5)</option></select></div>
+        <div><label>Migración</label><select id="ri_mig"><option value="0">No</option><option value="0.5">Sí (0.5)</option></select></div>
+        <div><label>Anorexia</label><select id="ri_ano"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>N/V</label><select id="ri_nv"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Duración &lt;48h</label><select id="ri_lt48"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Rebote</label><select id="ri_reb"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Fiebre</label><select id="ri_fever"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Toser/estornudar duele</label><select id="ri_cough"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Leucos &gt;10</label><select id="ri_wbc"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+        <div><label>Neg urianálisis</label><select id="ri_urine"><option value="0">No</option><option value="1">Sí (1)</option></select></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcRIPASA()">Calcular</button>
+        <div id="ripasa_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="fitzpatrick" class="card">
+      <h3>Fitzpatrick (I–VI)</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🎨</span><b>Base:</b> Fototipo cutáneo I–VI<br><b>Uso:</b> Fotoprotección, láser</div>
+      </div>
+      <div class="fitz-grid">
+        <div class="fitz-tile"><div class="fitz-img" style="background:#fde7d9"></div><div class="fitz-info"><b>I</b> Siempre se quema, nunca se broncea.</div></div>
+        <div class="fitz-tile"><div class="fitz-img" style="background:#f7d7bf"></div><div class="fitz-info"><b>II</b> Usualmente se quema, se broncea mínimamente.</div></div>
+        <div class="fitz-tile"><div class="fitz-img" style="background:#e7b089"></div><div class="fitz-info"><b>III</b> A veces se quema, se broncea gradualmente.</div></div>
+        <div class="fitz-tile"><div class="fitz-img" style="background:#c98b5a"></div><div class="fitz-info"><b>IV</b> Rara vez se quema, broncea bien.</div></div>
+        <div class="fitz-tile"><div class="fitz-img" style="background:#8b5b2a"></div><div class="fitz-info"><b>V</b> Muy rara vez se quema, broncea intensamente.</div></div>
+        <div class="fitz-tile"><div class="fitz-img" style="background:#5a391d"></div><div class="fitz-info"><b>VI</b> Nunca se quema, profundamente pigmentada.</div></div>
+      </div>
+    </section>
+
+    <section id="aha2025" class="card">
+      <h3>Riesgo cardiovascular (AHA 2025)</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🫀</span><b>Base:</b> PREVENT™ (requiere coeficientes)<br><b>Uso:</b> Riesgo 10/30 años</div>
+      </div>
+      <p class="muted">Coloca coeficientes oficiales en <code>config/aha2025.json</code> para activar el cálculo.</p>
+      <div class="grid">
+        <div><label>Edad</label><input id="aha_age" type="number" step="1"></div>
+        <div><label>Sexo</label><select id="aha_sex"><option value="M">Hombre</option><option value="F">Mujer</option></select></div>
+        <div><label>TA sistólica (mmHg)</label><input id="aha_sbp" type="number" step="1"></div>
+        <div><label>Colesterol total (mg/dL)</label><input id="aha_tc" type="number" step="1"></div>
+        <div><label>HDL (mg/dL)</label><input id="aha_hdl" type="number" step="1"></div>
+        <div><label>Fumador</label><select id="aha_smoke"><option value="0">No</option><option value="1">Sí</option></select></div>
+        <div><label>DM</label><select id="aha_dm"><option value="0">No</option><option value="1">Sí</option></select></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcAHA()">Calcular</button>
+        <div id="aha_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="pregwheel" class="card">
+      <h3>Rueda de embarazo</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">👶</span><b>Base:</b> Naegele 280d<br><b>Uso:</b> EG y FPP desde FUR</div>
+      </div>
+      <div class="grid">
+        <div><label>FUR</label><input id="fur" type="date"></div>
+        <div><label>Fecha de hoy</label><input id="today" type="date"></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcPregnancy()">Calcular</button>
+        <div id="preg_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="abl" class="card">
+      <h3>ABL permisible (sin transfusión)</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🩸</span><b>Base:</b> EBV por categoría + Hb<br><b>Uso:</b> Pérdida máx. antes de transfundir</div>
+      </div>
+      <div class="grid">
+        <div><label>Categoría</label>
+          <select id="abl_cat">
+            <option value="adult_male">Adult man</option>
+            <option value="adult_female">Adult woman</option>
+            <option value="infant">Infant</option>
+            <option value="neonate">Neonate</option>
+            <option value="preterm">Premature neonate</option>
+          </select>
+        </div>
+        <div><label>Peso (kg)</label><input id="abl_w" type="number" step="0.1"></div>
+        <div><label>Hb inicial (g/dL)</label><input id="abl_hb_i" type="number" step="0.1"></div>
+        <div><label>Hb final aceptable (g/dL)</label><input id="abl_hb_f" type="number" step="0.1"></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcABL()">Calcular</button>
+        <div id="abl_out" class="result"></div>
+        <div class="note">EBV (mL/kg): hombre 75, mujer 65, infante 80, neonato 85, prematuro 95 (ajusta según protocolo).</div>
+      </div>
+    </section>
+
+    <section id="childpugh" class="card">
+      <h3>Child-Pugh</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🧫</span><b>Base:</b> Bilirrubina, Alb, INR, Ascitis, Encefalopatía<br><b>Uso:</b> Clasificación A/B/C</div>
+      </div>
+      <div class="grid">
+        <div><label>Bilirrubina (mg/dL)</label><input id="cp_bili" type="number" step="0.1"></div>
+        <div><label>Albúmina (g/dL)</label><input id="cp_alb" type="number" step="0.1"></div>
+        <div><label>INR</label><input id="cp_inr" type="number" step="0.1"></div>
+        <div><label>Ascitis</label><select id="cp_asc"><option value="1">No (1)</option><option value="2">Leve (2)</option><option value="3">Moderada (3)</option></select></div>
+        <div><label>Encefalopatía</label><select id="cp_enc"><option value="1">No (1)</option><option value="2">Grado I–II (2)</option><option value="3">Grado III–IV (3)</option></select></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcChildPugh()">Calcular</button>
+        <div id="cp_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="calccorr" class="card">
+      <h3>Calcio corregido por albúmina</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🧪</span><b>Base:</b> Ca + 0.8×(4−Alb)<br><b>Uso:</b> Ajuste por hipoalbuminemia</div>
+      </div>
+      <div class="grid">
+        <div><label>Calcio (mg/dL)</label><input id="ca_meas" type="number" step="0.01"></div>
+        <div><label>Albúmina (g/dL)</label><input id="alb_meas" type="number" step="0.01"></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcCalcium()">Calcular</button>
+        <div id="ca_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="peddose" class="card">
+      <h3>Dosis pediátrica (genérica)</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">💊</span><b>Base:</b> mg/kg + tope + mL<br><b>Uso:</b> Cálculo por presentación</div>
+      </div>
+      <div class="grid">
+        <div><label>Peso (kg)</label><input id="pd_w" type="number" step="0.1"></div>
+        <div><label>Dosis (mg/kg)</label><input id="pd_mgkg" type="number" step="0.01"></div>
+        <div><label>Dosis máx. (mg) (opcional)</label><input id="pd_max" type="number" step="0.1"></div>
+        <div><label>Presentación (mg/mL) (opcional)</label><input id="pd_conc" type="number" step="0.01"></div>
+        <div><label>Frecuencia (por día)</label><input id="pd_freq" type="number" step="1" value="2"></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcPedDose()">Calcular</button>
+        <div id="pd_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="gcs" class="card">
+      <h3>Glasgow (adulto & pediatría)</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🧠</span><b>Base:</b> E/V/M por edad<br><b>Uso:</b> Severidad TCE</div>
+      </div>
+      <div class="grid">
+        <div><label>Tipo</label><select id="gcs_type"><option value="adult">Adulto</option><option value="peds">Pediatría</option></select></div>
+        <div><label>Apertura ocular</label><select id="gcs_e"></select></div>
+        <div><label>Respuesta verbal</label><select id="gcs_v"></select></div>
+        <div><label>Respuesta motora</label><select id="gcs_m"></select></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcGCS()">Calcular</button>
+        <div id="gcs_out" class="result"></div>
+      </div>
+    </section>
+
+    <section id="gbs" class="card">
+      <h3>Glasgow-Blatchford (HDA)</h3>
+      <div class="meta">
+        <div class="badge"><span class="emoji">🩸</span><b>Base:</b> Clínico + laboratorio<br><b>Uso:</b> Triage y manejo inicial HDA</div>
+      </div>
+      <div class="grid">
+        <div><label>Urea (BUN, mg/dL)</label><input id="gbs_bun" type="number" step="0.1"></div>
+        <div><label>Hb (g/dL)</label><input id="gbs_hb" type="number" step="0.1"></div>
+        <div><label>TA sistólica (mmHg)</label><input id="gbs_sbp" type="number" step="1"></div>
+        <div><label>FC (lpm)</label><input id="gbs_hr" type="number" step="1"></div>
+        <div><label>Melena</label><select id="gbs_melena"><option value="0">No</option><option value="1">Sí</option></select></div>
+        <div><label>Síncope</label><select id="gbs_syncope"><option value="0">No</option><option value="1">Sí</option></select></div>
+        <div><label>Enf. hepática</label><select id="gbs_hepatic"><option value="0">No</option><option value="1">Sí</option></select></div>
+        <div><label>IC congestiva</label><select id="gbs_chf"><option value="0">No</option><option value="1">Sí</option></select></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="primary" onclick="calcGBS()">Calcular</button>
+        <div id="gbs_out" class="result"></div>
+      </div>
+    </section>
+
+  </main>
+  <script src="app.js"></script>
+
+  <script src="lib/prevent_like.js"></script>
+</body>
+</html>
