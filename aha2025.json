@@ -1,1 +1,38 @@
-{"note":"Pega aquí coeficientes PREVENT oficiales cuando los tengas."}
+/*! PREVENT-like adjustment (educational, not official PREVENT by AHA) */
+(function(global){
+  function preventLikeAdjust(opts){
+    const risk_pce = Math.min(Math.max(Number(opts?.risk_pce ?? 0), 0), 0.999999);
+    const hba1c = Number(opts?.hba1c ?? 5.5);
+    const bmi = Number(opts?.bmi ?? 25);
+    const egfr = (opts?.egfr==null? null : Number(opts.egfr));
+    const uacr_mgg = (opts?.uacr_mgg==null? null : Number(opts.uacr_mgg));
+
+    const deltaHbA1c = Math.max(hba1c - 5.5, 0);
+    const lnHR_hba1c = Math.log(1.05) * deltaHbA1c;
+
+    const deltaBMI5 = Math.max((bmi - 25) / 5, 0);
+    const lnHR_bmi = Math.log(1.10) * deltaBMI5;
+
+    let HR_eGFR = 1.0;
+    if (egfr != null && !Number.isNaN(egfr)) {
+      if (egfr < 30) HR_eGFR = 2.0;
+      else if (egfr < 45) HR_eGFR = 1.8;
+      else if (egfr < 60) HR_eGFR = 1.4;
+      else if (egfr < 90) HR_eGFR = 1.2;
+    }
+    const lnHR_egfr = Math.log(HR_eGFR);
+
+    let HR_uacr = 1.0;
+    if (uacr_mgg != null && !Number.isNaN(uacr_mgg)) {
+      if (uacr_mgg >= 300) HR_uacr = 2.0;
+      else if (uacr_mgg >= 30) HR_uacr = 1.4;
+    }
+    const lnHR_uacr = Math.log(HR_uacr);
+
+    const F = Math.exp(lnHR_hba1c + lnHR_bmi + lnHR_egfr + lnHR_uacr);
+    const risk_adj = 1 - Math.pow(1 - risk_pce, F);
+
+    return { risk_adj, F, components: { lnHR_hba1c, lnHR_bmi, lnHR_egfr, lnHR_uacr } };
+  }
+  global.preventLikeAdjust = preventLikeAdjust;
+})(typeof window !== "undefined" ? window : globalThis);
