@@ -1,1 +1,43 @@
-{"note":"Pega aquí coeficientes PREVENT oficiales cuando los tengas."}
+// Ajuste PREVENT-like sobre riesgo PCE a 10 años
+export function preventLikeAdjust({
+  risk_pce,   // (0..1) riesgo 10y desde PCE
+  hba1c,      // % (ej. 7.2)
+  bmi,        // kg/m^2
+  egfr,       // mL/min/1.73m2
+  uacr_mgg    // mg/g
+}) {
+  // 1) HbA1c ~ HR 1.05 por +1%
+  const deltaHbA1c = Math.max((hba1c ?? 5.5) - 5.5, 0);
+  const lnHR_hba1c = Math.log(1.05) * deltaHbA1c;
+
+  // 2) BMI ~ HR 1.10 por +5 kg/m2 por encima de 25
+  const deltaBMI5 = Math.max(((bmi ?? 25) - 25) / 5, 0);
+  const lnHR_bmi = Math.log(1.10) * deltaBMI5;
+
+  // 3) eGFR categorías (referencia 90-104)
+  let HR_eGFR = 1.0;
+  if (egfr != null) {
+    if (egfr < 30) HR_eGFR = 2.0;
+    else if (egfr < 45) HR_eGFR = 1.8;
+    else if (egfr < 60) HR_eGFR = 1.4;
+    else if (egfr < 90) HR_eGFR = 1.2;
+  }
+  const lnHR_egfr = Math.log(HR_eGFR);
+
+  // 4) UACR categorías (mg/g; referencia <30)
+  let HR_uacr = 1.0;
+  if (uacr_mgg != null) {
+    if (uacr_mgg >= 300) HR_uacr = 2.0;
+    else if (uacr_mgg >= 30) HR_uacr = 1.4;
+  }
+  const lnHR_uacr = Math.log(HR_uacr);
+
+  // Factor total en escala de hazard
+  const F = Math.exp(lnHR_hba1c + lnHR_bmi + lnHR_egfr + lnHR_uacr);
+
+  // Riesgo ajustado (mantiene rango 0..1)
+  const base = Math.min(Math.max(risk_pce, 0), 0.999999);
+  const risk_adj = 1 - Math.pow(1 - base, F);
+
+  return { risk_adj, F, components: { lnHR_hba1c, lnHR_bmi, lnHR_egfr, lnHR_uacr } };
+}
