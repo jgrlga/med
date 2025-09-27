@@ -4,12 +4,13 @@
  * Config en config.json: ICD_PROXY_BASE, ICD_RELEASE, TIMEOUT_MS, RETRY
  */
 
-let ICDCFG = {
-  base: "",
-  release: "2024-01",
-  timeoutMs: 12000,
-  retry: { retries: 1, backoff_ms: 400 }
-};
+let ICDCFG = 
+  {
+  "ICD_PROXY_BASE": "https://TU-WORKER.workers.dev",
+  "ICD_RELEASE": "2024-01",
+  "TIMEOUT_MS": 12000,
+  "RETRY": { "retries": 1, "backoff_ms": 400 }
+;
 
 export function setICDConfig(cfg) {
   if (cfg?.ICD_PROXY_BASE) ICDCFG.base = cfg.ICD_PROXY_BASE.replace(/\/+$/, "");
