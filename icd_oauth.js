@@ -6,7 +6,7 @@
 
 let ICDCFG = 
   {
-  "ICD_PROXY_BASE": "https://TU-WORKER.workers.dev",
+  "ICD_PROXY_BASE": "https://medtools.jgrlga.workers.dev",
   "ICD_RELEASE": "2024-01",
   "TIMEOUT_MS": 12000,
   "RETRY": { "retries": 1, "backoff_ms": 400 }
