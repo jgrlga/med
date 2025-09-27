@@ -42,45 +42,6 @@
   <header>MedCalc</header>
   <main>
 
-    <section id="icd" class="card">
-      <h3>Buscador CIE-11 (ICD-11)</h3>
-      <div class="meta">
-        <div class="badge"><span class="emoji">🧾</span><b>Base:</b> API oficial ICD-11 (WHO)<br><b>Uso:</b> Buscar códigos y entidades</div>
-      </div>
-      <details>
-        <summary>Configurar acceso (una vez)</summary>
-        <div class="settings-grid" style="margin-top:10px">
-          <div>
-            <label>Endpoint de búsqueda</label>
-            <input id="icd_endpoint" placeholder="https://id.who.int/icd/entity/search">
-          </div>
-          <div>
-            <label>Token (Bearer)</label>
-            <input id="icd_token" placeholder="pega tu token...">
-          </div>
-        </div>
-        <div style="margin-top:10px">
-          <button onclick="saveICDSettings()">Guardar</button>
-          <span class="muted">Se guarda en este dispositivo.</span>
-        </div>
-      </details>
-      <div class="grid" style="margin-top:12px">
-        <div><label>Búsqueda</label><input id="icd_q" placeholder="ej. diabetes, J45, appendicitis..."></div>
-        <div>
-          <label>Idioma</label>
-          <select id="icd_lang">
-            <option value="es">es</option>
-            <option value="en">en</option>
-          </select>
-        </div>
-      </div>
-      <div style="margin-top:12px">
-        <button class="primary" onclick="icdSearch()">Buscar</button>
-        <div id="icd_status" class="note" style="margin-top:8px"></div>
-        <ul id="icd_results" class="icd-list"></ul>
-      </div>
-    </section>
-
     <section class="card">
       <h2>Calculadoras</h2>
       <nav class="calc-list">
